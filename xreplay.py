@@ -19,6 +19,7 @@ from time import sleep
 from threading import Thread
 from queue import Queue
 from datetime import datetime
+import json
 
 parser = argparse.ArgumentParser()
 
@@ -306,12 +307,13 @@ if OUTPUT=="xata":
 elif OUTPUT=="file":
     print("- Writing schema to",OUTPUT_PATH+"schema.json")
     with open(OUTPUT_PATH+"schema.json", "w") as f:
-        f.write(str(from_schema["schema"]))
+        f.write(json.dumps(from_schema["schema"]))
         to_schema=from_schema
     if OUTPUT_FORMAT=="csv":
         for table in from_schema["schema"]["tables"]:
             with open(OUTPUT_PATH+table["name"]+".csv", "a") as f:
                 column_counter=0
+                f.write('id,')
                 for column in table["columns"]:
                     column_counter+=1
                     if column_counter<len(table["columns"]):
