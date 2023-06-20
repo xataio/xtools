@@ -1,6 +1,6 @@
 # Xreplay
 
-Copy Xata databases across accounts, workspaces, regions and branches, or store schema and table content to files on disk.
+Copy Xata databases across accounts, workspaces, regions and branches, or store schema and table content to files on disk in JSON or CSV format.
 
 ## Description
 
