@@ -44,6 +44,7 @@ Optional:
 - `--page_size`: the scroll page size to use when reading from the source database. 1 to 200. Default 200.
 - `--queue_size`: the size of the in-memory queue for inflight events per table. page_size to 10000. Default 1000.
 - `--output_path`: custom path on disk to write table content to, only if the file output is used.
+- `--output_format`: File export format, must be one of `json` or `csv`.
 - `--links_backfill_method`: link backfilling method. Can be one of bulk (which is the default), atomic, or transaction. Bulk will rewrite entire records when creating links but in bulks. Atomic will update only the link content, but it cannot be performed in bulk. Transaction performs bulk updates of links. Bulk will work faster in most cases, but the option for atomic backfill is available for cases with particularly large records where overwritting the entire record even in bulk, is slower than performing atomic updates. Lastly, transaction uses the experimental transaction api to perform link updates in bulks.
 - `--custom_source`: Custom xata source url other than the production endpoint
 - `--custom_source_host_header`: Custom host header to use with the custom source url
@@ -91,7 +92,7 @@ python3 xreplay.py \
 --output xata
 ```
 
-Writing to file on disk in custom directory (otherwise the default "output" is used):
+Writing to file on disk in JSON format (default) under a custom directory (otherwise the default "output" is used):
 
 ```
 python3 xreplay.py \
@@ -102,6 +103,20 @@ python3 xreplay.py \
 --from_XATA_API_KEY $SOURCE_XATA_API_KEY \
 --output file \
 --output_path myoutput
+```
+
+Writing to file on disk in CSV format under a custom directory:
+
+```
+python3 xreplay.py \
+--from_workspace cp1jil \
+--from_database mysourcedb \
+--from_branch main \
+--from_region eu-west-1 \
+--from_XATA_API_KEY $SOURCE_XATA_API_KEY \
+--output file \
+--output_path myoutput \
+--output_format csv
 ```
 
 ## Output samples
@@ -257,8 +272,9 @@ Data transfer completed. Processed 14425 records total.
 
 ## Converting file outputs to CSV
 
-Using the file output mode, the tool produces outputs in JSON (from Python Dictionary) format.
-The following script can be used in order to convert the JSON files to CSV.
+You can use the `--output_format csv` parameter combined with `--output file` to export records to CSV.
+
+Additionally, the following script can be used to convert JSON records to CSV format.
 
 ```
 import pandas as pd

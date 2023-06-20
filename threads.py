@@ -82,7 +82,7 @@ def producer(queue,PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_link
                 more=False
     queue.put(None)
 
-def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,output,output_path,ERROR_FILE,host_header='',mode="full",records_type="all"):
+def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema,schema_links,table_categories,output,output_format,output_path,ERROR_FILE,host_header='',mode="full",records_type="all"):
     # consume work
     records=[]
     while True:
@@ -116,10 +116,32 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                         error_report={table:{"errors":errors}}
                         reporting_queue.put(error_report)
                 elif output=="file":
-                    with open(output_path+table+".log", "a") as f:
-                        for record in records:
-                            f.write(str(record) + '\n')
-                        errors={}
+                    if output_format=="json":
+                        with open(output_path+table+".log", "a") as f:
+                            for record in records:
+                                f.write(str(record) + '\n')
+                            errors={}
+                    elif output_format=="csv":
+                        with open(output_path+table+".csv", "a") as f:
+                            for record in records:
+                                csv_record=''
+                                csv_record_position=1
+                                for current_table in schema["schema"]["tables"]:
+                                    if current_table["name"]==table:
+                                        csv_record_max_position=len(current_table["columns"])
+                                        if "id" in record:
+                                            csv_record+=str(record["id"])+','
+                                        for schema_column in current_table["columns"]:
+                                            if schema_column["name"] in record:
+                                                if schema_column["type"] in ("multiple","string","text","object") and len(record[schema_column["name"]])>0:
+                                                    csv_record+='"'+str(record[schema_column["name"]]).replace('"', '""')+'"'
+                                                else:
+                                                    csv_record+=str(record[schema_column["name"]])
+                                            if csv_record_position<csv_record_max_position:
+                                                csv_record+=','
+                                            csv_record_position+=1
+                                f.write(str(csv_record) + '\n')
+                            errors={}
                 status_report={}
                 status_report={table:{"records":len(records)}}
                 reporting_queue.put(status_report)
@@ -185,10 +207,33 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                 error_report={table:{"errors":errors}}
                 reporting_queue.put(error_report)
         elif output=="file":
-            with open(output_path+table+".log", "a") as f:
-                for record in records:
-                    f.write(str(record) + '\n')
-                errors={}
+            if output_format=="json":
+                with open(output_path+table+".log", "a") as f:
+                    for record in records:
+                        f.write(str(record) + '\n')
+                    errors={}
+            elif output_format=="csv":
+                with open(output_path+table+".csv", "a") as f:
+                    for record in records:
+                        csv_record=''
+                        csv_record_position=1
+                        for current_table in schema["schema"]["tables"]:
+                            if current_table["name"]==table:
+                                csv_record_max_position=len(current_table["columns"])
+                                if "id" in record:
+                                    csv_record+=str(record["id"])+','
+                                for schema_column in current_table["columns"]:
+                                    if schema_column["name"] in record:
+                                        if schema_column["type"] in ("multiple","string","text","object") and len(record[schema_column["name"]])>0:
+                                            csv_record+='"'+str(record[schema_column["name"]]).replace('"', '""')+'"'
+                                        else:
+                                            csv_record+=str(record[schema_column["name"]])
+                                    if csv_record_position<csv_record_max_position:
+                                        csv_record+=','
+                                    csv_record_position+=1
+                        f.write(str(csv_record) + '\n')
+                    errors={}
+
         status_report={}
         status_report={table:{"records":len(records)}}
         reporting_queue.put(status_report)
@@ -233,7 +278,7 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
         close_report={table:{"links":None}}
         reporting_queue.put(close_report)
 
-def reporter(queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERROR_FILE,CONCURRENT_CONSUMERS,host_header,output,output_path):
+def reporter(queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERROR_FILE,CONCURRENT_CONSUMERS,host_header,output,output_format,output_path):
     LINE_UP = '\033[1A'
     LINE_CLEAR = '\x1b[2K'
     report={}
@@ -248,10 +293,16 @@ def reporter(queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERR
             if category=="category3" and len(table_categories[category])>0:
                 print(table_categories[category],"contain links to other tables with links and will be copied last. Links will be backfilled after all records have been copied.")
     elif output=="file":
-        print("\nTable output file paths:")
-        for category in table_categories:
-            for ordered_table in table_categories[category]:
-                print("-",ordered_table+":",output_path+ordered_table+".log")
+        if output_format=="json":
+            print("\nTable output file paths:")
+            for category in table_categories:
+                for ordered_table in table_categories[category]:
+                    print("-",ordered_table+":",output_path+ordered_table+".log")
+        elif output_format=="csv":
+            print("\nTable output csv paths:")
+            for category in table_categories:
+                for ordered_table in table_categories[category]:
+                    print("-",ordered_table+":",output_path+ordered_table+".csv")
     print("\n>>> COPYING TABLE DATA <<<\n")
     start = datetime.now()
     for table in tables:
