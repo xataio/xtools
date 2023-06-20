@@ -344,7 +344,7 @@ for category in category_order:
                 table_threads[table]={}
                 table_threads[table]["consumers"]={}
                 for consumer_iterator in range(CONCURRENT_CONSUMERS):
-                    table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header))
+                    table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,to_schema,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header))
                     table_threads[table]["consumers"][str(consumer_iterator)].start()
                 table_threads[table]["producer"] = Thread(target=producer, args=(table_queues[table],PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,source_host_header))
                 table_threads[table]["producer"].start()
