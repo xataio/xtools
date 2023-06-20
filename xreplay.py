@@ -53,6 +53,7 @@ args = parser.parse_args()
 
 if str(args.output).lower() == "xata":
     OUTPUT="xata"
+    OUTPUT_PATH=''
     OUTPUT_FORMAT="json"
 elif str(args.output).lower() == "file":
     OUTPUT="file"
