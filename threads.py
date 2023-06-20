@@ -132,7 +132,7 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                                         for schema_column in current_table["columns"]:
                                             if schema_column["name"] in record:
                                                 if schema_column["type"] in ("multiple","string","text","object"):
-                                                    csv_record+='"'+str(record[schema_column["name"]])+'"'
+                                                    csv_record+='"'+str(record[schema_column["name"]]).replace('"', '""')+'"'
                                                 else:
                                                     csv_record+=str(record[schema_column["name"]])
                                             if csv_record_position<csv_record_max_position:
@@ -221,7 +221,7 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                                 for schema_column in current_table["columns"]:
                                     if schema_column["name"] in record:
                                         if schema_column["type"] in ("multiple","string","text","object"):
-                                            csv_record+='"'+str(record[schema_column["name"]])+'"'
+                                            csv_record+='"'+str(record[schema_column["name"]]).replace('"', '""')+'"'
                                         else:
                                             csv_record+=str(record[schema_column["name"]])
                                     if csv_record_position<csv_record_max_position:
@@ -274,7 +274,7 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
         close_report={table:{"links":None}}
         reporting_queue.put(close_report)
 
-def reporter(queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERROR_FILE,CONCURRENT_CONSUMERS,host_header,output,output_path):
+def reporter(queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERROR_FILE,CONCURRENT_CONSUMERS,host_header,output,output_format,output_path):
     LINE_UP = '\033[1A'
     LINE_CLEAR = '\x1b[2K'
     report={}
@@ -289,10 +289,16 @@ def reporter(queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERR
             if category=="category3" and len(table_categories[category])>0:
                 print(table_categories[category],"contain links to other tables with links and will be copied last. Links will be backfilled after all records have been copied.")
     elif output=="file":
-        print("\nTable output file paths:")
-        for category in table_categories:
-            for ordered_table in table_categories[category]:
-                print("-",ordered_table+":",output_path+ordered_table+".log")
+        if output_format=="json":
+            print("\nTable output file paths:")
+            for category in table_categories:
+                for ordered_table in table_categories[category]:
+                    print("-",ordered_table+":",output_path+ordered_table+".log")
+        elif output_format=="csv":
+            print("\nTable output csv paths:")
+            for category in table_categories:
+                for ordered_table in table_categories[category]:
+                    print("-",ordered_table+":",output_path+ordered_table+".csv")
     print("\n>>> COPYING TABLE DATA <<<\n")
     start = datetime.now()
     for table in tables:

@@ -52,6 +52,7 @@ args = parser.parse_args()
 
 if str(args.output).lower() == "xata":
     OUTPUT="xata"
+    OUTPUT_FORMAT="json"
 elif str(args.output).lower() == "file":
     OUTPUT="file"
     if str(args.output_format).lower() == "csv":
@@ -328,7 +329,7 @@ category_order=["category1","category2","category3"]
 table_queues={}
 table_threads={}
 reporting_queue = Queue(len(tables))
-reporter = Thread(target=reporter, args=(reporting_queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERROR_FILE,CONCURRENT_CONSUMERS,source_host_header,OUTPUT,OUTPUT_PATH))
+reporter = Thread(target=reporter, args=(reporting_queue,tables,table_categories,from_XATA_API_KEY,from_BRANCH_URL,ERROR_FILE,CONCURRENT_CONSUMERS,source_host_header,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH))
 reporter.start()
 for category in category_order:
     #Logic for replaying data to Xata
