@@ -82,7 +82,7 @@ def producer(queue,PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_link
                 more=False
     queue.put(None)
 
-def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,output,output_path,ERROR_FILE,host_header='',mode="full",records_type="all"):
+def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema,schema_links,table_categories,output,output_format,output_path,ERROR_FILE,host_header='',mode="full",records_type="all"):
     # consume work
     records=[]
     while True:
@@ -116,10 +116,30 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                         error_report={table:{"errors":errors}}
                         reporting_queue.put(error_report)
                 elif output=="file":
-                    with open(output_path+table+".log", "a") as f:
-                        for record in records:
-                            f.write(str(record) + '\n')
-                        errors={}
+                    if output_format=="json":
+                        with open(output_path+table+".log", "a") as f:
+                            for record in records:
+                                f.write(str(record) + '\n')
+                            errors={}
+                    elif output_format=="csv":
+                        with open(output_path+table+".csv", "a") as f:
+                            for record in records:
+                                csv_record=''
+                                csv_record_position=1
+                                for current_table in schema["schema"]["tables"]:
+                                    if current_table["name"]==table:
+                                        csv_record_max_position=len(current_table["columns"])
+                                        for schema_column in current_table["columns"]:
+                                            if schema_column["name"] in record:
+                                                if schema_column["type"] in ("multiple","string","text","object"):
+                                                    csv_record+='"'+str(record[schema_column["name"]])+'"'
+                                                else:
+                                                    csv_record+=str(record[schema_column["name"]])
+                                            if csv_record_position<csv_record_max_position:
+                                                csv_record+=','
+                                            csv_record_position+=1
+                                f.write(str(csv_record) + '\n')
+                            errors={}
                 status_report={}
                 status_report={table:{"records":len(records)}}
                 reporting_queue.put(status_report)
@@ -185,10 +205,31 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                 error_report={table:{"errors":errors}}
                 reporting_queue.put(error_report)
         elif output=="file":
-            with open(output_path+table+".log", "a") as f:
-                for record in records:
-                    f.write(str(record) + '\n')
-                errors={}
+            if output_format=="json":
+                with open(output_path+table+".log", "a") as f:
+                    for record in records:
+                        f.write(str(record) + '\n')
+                    errors={}
+            elif output_format=="csv":
+                with open(output_path+table+".csv", "a") as f:
+                    for record in records:
+                        csv_record=''
+                        csv_record_position=1
+                        for current_table in schema["schema"]["tables"]:
+                            if current_table["name"]==table:
+                                csv_record_max_position=len(current_table["columns"])
+                                for schema_column in current_table["columns"]:
+                                    if schema_column["name"] in record:
+                                        if schema_column["type"] in ("multiple","string","text","object"):
+                                            csv_record+='"'+str(record[schema_column["name"]])+'"'
+                                        else:
+                                            csv_record+=str(record[schema_column["name"]])
+                                    if csv_record_position<csv_record_max_position:
+                                        csv_record+=','
+                                    csv_record_position+=1
+                        f.write(str(csv_record) + '\n')
+                    errors={}
+
         status_report={}
         status_report={table:{"records":len(records)}}
         reporting_queue.put(status_report)

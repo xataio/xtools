@@ -40,6 +40,7 @@ parser.add_argument("--queue_size",help="Number of inflight events we can store 
 parser.add_argument("--error_file",help="File path to output errors.",required=False)
 parser.add_argument("--output", help = "Where to output records: xata or local files. Options: xata,file",required=True)
 parser.add_argument("--output_path",help="Directory to write record content to.",required=False)
+parser.add_argument("--output_format",help="Directory to write record content to.",required=False)
 parser.add_argument("--links_backfill_method",help="How to backfill links: bulk updates using transactions, bulk rewrite entire records, atomic link column updates. Options: transaction,bulk,atomic. Default: transaction",required=False)
 parser.add_argument("--custom_source",help="Using a custom source instead of Xata's Production endpoints",required=False)
 parser.add_argument("--custom_source_host_header",help="Using a custom host header for connections to the source",required=False)
@@ -51,9 +52,12 @@ args = parser.parse_args()
 
 if str(args.output).lower() == "xata":
     OUTPUT="xata"
-    OUTPUT_PATH=''
 elif str(args.output).lower() == "file":
     OUTPUT="file"
+    if str(args.output_format).lower() == "csv":
+        OUTPUT_FORMAT="csv"
+    else:
+        OUTPUT_FORMAT="json"
 else:
     print("Please specify a valid --output target value (xata or file).")
     exit(-1)
@@ -303,7 +307,16 @@ elif OUTPUT=="file":
     with open(OUTPUT_PATH+"schema.json", "w") as f:
         f.write(str(from_schema["schema"]))
         to_schema=from_schema
-
+    if OUTPUT_FORMAT=="csv":
+        for table in from_schema["schema"]["tables"]:
+            with open(OUTPUT_PATH+table["name"]+".csv", "a") as f:
+                column_counter=0
+                for column in table["columns"]:
+                    column_counter+=1
+                    if column_counter<len(table["columns"]):
+                        f.write(str(column["name"]) + ',')
+                    else:
+                        f.write(str(column["name"])+'\n')
 #Category 1: tables without links
 #Category 2: tables with links to tables without links
 #Category 3: tables with links to table with links. Category 3 tables require a second pass, meaning we index them without links and after all tables have been indexed, we create links.
@@ -327,7 +340,7 @@ for category in category_order:
                 table_threads[table]={}
                 table_threads[table]["consumers"]={}
                 for consumer_iterator in range(CONCURRENT_CONSUMERS):
-                    table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_PATH,ERROR_FILE,destination_host_header))
+                    table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header))
                     table_threads[table]["consumers"][str(consumer_iterator)].start()
                 table_threads[table]["producer"] = Thread(target=producer, args=(table_queues[table],PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,source_host_header))
                 table_threads[table]["producer"].start()
@@ -342,7 +355,7 @@ for category in category_order:
                 table_threads[table]={}
                 table_threads[table]["consumers"]={}
                 for consumer_iterator in range(CONCURRENT_CONSUMERS):
-                    table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"no_links"))
+                    table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,to_schema,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"no_links"))
                     table_threads[table]["consumers"][str(consumer_iterator)].start()
                 table_threads[table]["producer"] = Thread(target=producer, args=(table_queues[table],PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,source_host_header))
                 table_threads[table]["producer"].start()
@@ -357,7 +370,7 @@ for category in category_order:
                     table_threads[table]={}
                     table_threads[table]["consumers"]={}
                     for consumer_iterator in range(CONCURRENT_CONSUMERS):
-                        table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"only_links"))
+                        table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,to_schema,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"only_links"))
                         table_threads[table]["consumers"][str(consumer_iterator)].start()
                     table_threads[table]["producer"] = Thread(target=producer, args=(table_queues[table],PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,source_host_header,"only_links"))
                     table_threads[table]["producer"].start()
@@ -372,7 +385,7 @@ for category in category_order:
                     table_threads[table]={}
                     table_threads[table]["consumers"]={}
                     for consumer_iterator in range(CONCURRENT_CONSUMERS):
-                        table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"bulk_links_transaction"))
+                        table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,to_schema,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"bulk_links_transaction"))
                         table_threads[table]["consumers"][str(consumer_iterator)].start()
                     table_threads[table]["producer"] = Thread(target=producer, args=(table_queues[table],PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,source_host_header,"only_links"))
                     table_threads[table]["producer"].start()
@@ -387,7 +400,7 @@ for category in category_order:
                     table_threads[table]={}
                     table_threads[table]["consumers"]={}
                     for consumer_iterator in range(CONCURRENT_CONSUMERS):
-                        table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"full","with_links"))
+                        table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,to_schema,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header,"full","with_links"))
                         table_threads[table]["consumers"][str(consumer_iterator)].start()
                     table_threads[table]["producer"] = Thread(target=producer, args=(table_queues[table],PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,source_host_header,"full","with_links"))
                     table_threads[table]["producer"].start()
@@ -402,7 +415,7 @@ for category in category_order:
             table_threads[table]={}
             table_threads[table]["consumers"]={}
             for consumer_iterator in range(CONCURRENT_CONSUMERS):
-                table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,schema_links,table_categories,OUTPUT,OUTPUT_PATH,ERROR_FILE,destination_host_header))
+                table_threads[table]["consumers"][str(consumer_iterator)] = Thread(target=consumer, args=(table_queues[table],reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table,to_schema,schema_links,table_categories,OUTPUT,OUTPUT_FORMAT,OUTPUT_PATH,ERROR_FILE,destination_host_header))
                 table_threads[table]["consumers"][str(consumer_iterator)].start()
             table_threads[table]["producer"] = Thread(target=producer, args=(table_queues[table],PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,source_host_header))
             table_threads[table]["producer"].start()  
