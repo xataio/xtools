@@ -6,6 +6,7 @@ from methods import (
     patch
 )
 from datetime import datetime
+from operator import itemgetter
 
 def producer(queue,PAGE_SIZE,from_XATA_API_KEY,from_BRANCH_URL,table,schema_links,ERROR_FILE,host_header='',mode="full",fetch_records="all"):
     query_payload={}
@@ -131,7 +132,7 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                                         csv_record_max_position=len(current_table["columns"])
                                         if "id" in record:
                                             csv_record+=str(record["id"])+','
-                                        for schema_column in current_table["columns"]:
+                                        for schema_column in sorted(current_table["columns"], key=itemgetter('name')):
                                             if schema_column["name"] in record:
                                                 if schema_column["type"] in ("multiple","string","text","object") and len(record[schema_column["name"]])>0:
                                                     csv_record+='"'+str(record[schema_column["name"]]).replace('"', '""')+'"'
@@ -222,7 +223,7 @@ def consumer(queue,reporting_queue,BULK_SIZE,to_XATA_API_KEY,to_BRANCH_URL,table
                                 csv_record_max_position=len(current_table["columns"])
                                 if "id" in record:
                                     csv_record+=str(record["id"])+','
-                                for schema_column in current_table["columns"]:
+                                for schema_column in sorted(current_table["columns"], key=itemgetter('name')):
                                     if schema_column["name"] in record:
                                         if schema_column["type"] in ("multiple","string","text","object") and len(record[schema_column["name"]])>0:
                                             csv_record+='"'+str(record[schema_column["name"]]).replace('"', '""')+'"'

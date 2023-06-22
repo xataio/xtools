@@ -20,6 +20,7 @@ from threading import Thread
 from queue import Queue
 from datetime import datetime
 import json
+from operator import itemgetter
 
 parser = argparse.ArgumentParser()
 
@@ -315,7 +316,7 @@ elif OUTPUT=="file":
             with open(OUTPUT_PATH+table["name"]+".csv", "a") as f:
                 column_counter=0
                 f.write('id,')
-                for column in table["columns"]:
+                for column in sorted(table["columns"], key=itemgetter('name')):
                     column_counter+=1
                     if column_counter<len(table["columns"]):
                         f.write(str(column["name"]) + ',')
