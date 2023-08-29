@@ -359,7 +359,7 @@ def main():
                                 )
                         else:
                             print(
-                                "- Unsupported media type",
+                                "\nUnsupported media type",
                                 column_file["mediaType"],
                                 "skipping file",
                                 column_file["name"],
