@@ -1,4 +1,8 @@
-## About
+# xfileindex
+
+Index file attachments content from `file` and `file[]` columns into `text` columns.
+
+## Description
 
 This script indexes content from files stored in Xata, into text columns in a target table so that the content can be used with Xata's advanced features such as full-text search and askAI.
 
