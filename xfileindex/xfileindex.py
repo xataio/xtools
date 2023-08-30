@@ -1,5 +1,6 @@
 import argparse
 from xata.client import XataClient
+from json import loads
 from textwrap import wrap
 from PyPDF2 import PdfReader
 from io import BytesIO
@@ -253,11 +254,16 @@ def ensure_target_table(xata: XataClient):
             TARGET_TABLE, branch_name=BRANCH
         )
         if get_table_schema_response.is_success():
-            if get_table_schema_response.content == target_table_schema:
+            current_schema = loads(get_table_schema_response.content)
+            if current_schema != target_table_schema:
                 print(
                     "Error: Target table",
                     TARGET_TABLE,
-                    "schema exists but deviates from expected schema:",
+                    "exists but deviates from expected schema.\n",
+                    "Existing schema:",
+                    current_schema,
+                    "\n",
+                    "Expected schema:",
                     target_table_schema,
                     "\nAborting.",
                 )
