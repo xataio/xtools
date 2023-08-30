@@ -127,8 +127,6 @@ def ingest_chunks(
     xata,
     chunks,
     source_record,
-    source_table,
-    target_table,
     column_type,
     column,
     column_file,
@@ -147,13 +145,13 @@ def ingest_chunks(
         if ID_STRATEGY == "deterministic":
             if column_type == "single_file":
                 chunk_rec_id = (
-                    f'{source_record["id"]}-{source_table}-{column}-{chunk_iterator}'
+                    f'{source_record["id"]}-{SOURCE_TABLE}-{column}-{chunk_iterator}'
                 )
             elif column_type == "multiple_files":
-                chunk_rec_id = f'{source_record["id"]}-{source_table}-{column}-{column_file["id"]}-{chunk_iterator}'
+                chunk_rec_id = f'{source_record["id"]}-{SOURCE_TABLE}-{column}-{column_file["id"]}-{chunk_iterator}'
             if MODE == "atomic":
                 resp = xata.records().upsert(
-                    target_table, chunk_rec_id, content_record, branch_name=BRANCH
+                    TARGET_TABLE, chunk_rec_id, content_record, branch_name=BRANCH
                 )
                 if resp.status_code in (200, 201):
                     print(
@@ -169,7 +167,7 @@ def ingest_chunks(
                 transaction_payload["operations"].append(
                     {
                         "update": {
-                            "table": target_table,
+                            "table": TARGET_TABLE,
                             "id": chunk_rec_id,
                             "fields": content_record,
                             "upsert": True,
@@ -179,7 +177,7 @@ def ingest_chunks(
         elif ID_STRATEGY == "random":
             if MODE == "atomic":
                 resp = xata.records().insert(
-                    target_table, content_record, branch_name=BRANCH
+                    TARGET_TABLE, content_record, branch_name=BRANCH
                 )
                 if resp.status_code == 201:
                     print(
@@ -195,7 +193,7 @@ def ingest_chunks(
                 transaction_payload["operations"].append(
                     {
                         "insert": {
-                            "table": target_table,
+                            "table": TARGET_TABLE,
                             "record": content_record,
                         }
                     }
@@ -224,7 +222,7 @@ def ingest_chunks(
         chunk_iterator += 1
 
 
-def ensure_target_table(xata: XataClient, target_table, source_table):
+def ensure_target_table(xata: XataClient):
     target_table_schema = {
         "columns": [
             {
@@ -233,142 +231,143 @@ def ensure_target_table(xata: XataClient, target_table, source_table):
             },
             {"name": "filename", "type": "string"},
             {"name": "origin_column", "type": "string"},
-            {"name": "source", "type": "link", "link": {"table": source_table}},
+            {"name": "source", "type": "link", "link": {"table": SOURCE_TABLE}},
         ]
     }
-    create_table_response = xata.table().create(target_table, branch_name=BRANCH)
+    create_table_response = xata.table().create(TARGET_TABLE, branch_name=BRANCH)
     if create_table_response.status_code == 201:
         set_table_schema_resp = xata.table().set_schema(
-            target_table, target_table_schema, branch_name=BRANCH
+            TARGET_TABLE, target_table_schema, branch_name=BRANCH
         )
         if not set_table_schema_resp.is_success():
             print(
                 "Error: Failed to create target table",
-                target_table,
+                TARGET_TABLE,
                 "with schema",
                 target_table_schema,
             )
             exit(-1)
-        print("Created new table", target_table)
+        print("Created new table", TARGET_TABLE)
     elif create_table_response.status_code == 204:
         get_table_schema_response = xata.table().get_schema(
-            target_table, branch_name=BRANCH
+            TARGET_TABLE, branch_name=BRANCH
         )
         if get_table_schema_response.is_success():
             if get_table_schema_response.content == target_table_schema:
                 print(
                     "Error: Target table",
-                    target_table,
+                    TARGET_TABLE,
                     "schema exists but deviates from expected schema:",
                     target_table_schema,
                     "\nAborting.",
                 )
                 exit(-1)
             else:
-                print("Using existing table", target_table)
+                print("Using existing table", TARGET_TABLE)
     else:
         print(
             "Unexpected code",
             create_table_response.status_code,
             "when creating or checking for table",
-            target_table,
+            TARGET_TABLE,
         )
         exit(-1)
 
 
+def process_response(xata, response):
+    for record in response["records"]:
+        for column in COLUMNS_TO_INDEX:
+            column_files = []
+            if column in record and type(record[column]) == dict:
+                column_type = "single_file"
+                column_files.append(record[column])
+            elif column in record and type(record[column]) == list:
+                column_type = "multiple_files"
+                for each_file in record[column]:
+                    column_files.append(each_file)
+
+            for column_file in column_files:
+                if "mediaType" in column_file:
+                    mediaType = column_file["mediaType"]
+                else:
+                    mediaType = "unknown"
+                if mediaType in SUPPORTED_MEDIA_TYPES:
+                    print(
+                        "\nDownloading file from table:",
+                        SOURCE_TABLE,
+                        ", record:",
+                        record["id"],
+                        ", column:",
+                        column,
+                        ", filename:",
+                        column_file["name"],
+                    )
+                    if column_type == "single_file":
+                        file = xata.files().get(
+                            table_name=SOURCE_TABLE,
+                            column_name=column,
+                            record_id=record["id"],
+                            branch_name=BRANCH,
+                        )
+                    elif column_type == "multiple_files":
+                        file = xata.files().get_item(
+                            table_name=SOURCE_TABLE,
+                            column_name=column,
+                            record_id=record["id"],
+                            file_id=column_file["id"],
+                            branch_name=BRANCH,
+                        )
+                    if file.is_success():
+                        chunks = process_file(file, mediaType)
+                        print(
+                            "- Processing record:",
+                            record["id"],
+                            ", column:",
+                            column,
+                            ", filename:",
+                            column_file["name"],
+                            ", type:",
+                            mediaType,
+                            "in",
+                            len(chunks),
+                            "chunk:" if len(chunks) == 1 else "chunks:",
+                        )
+                        ingest_chunks(
+                            xata,
+                            chunks,
+                            record,
+                            column_type,
+                            column,
+                            column_file,
+                        )
+                    else:
+                        print(
+                            "...Error",
+                            file.response,
+                            "while fetching file, skipping it.",
+                        )
+                else:
+                    print(
+                        "\nUnsupported media type",
+                        column_file["mediaType"],
+                        "skipping file",
+                        column_file["name"],
+                        "from record:",
+                        record["id"],
+                        "column:",
+                        column,
+                    )
+
+
 def main():
     xata = XataClient(db_url=TARGET_DB, branch_name=BRANCH)
-    ensure_target_table(xata, TARGET_TABLE, SOURCE_TABLE)
+    ensure_target_table(xata)
     querypayload = {"columns": COLUMNS_TO_INDEX, "page": {"size": PAGE_SIZE}}
     more = True
     while more:
         response = xata.data().query(SOURCE_TABLE, querypayload, branch_name=BRANCH)
         if "records" in response:
-            for record in response["records"]:
-                for column in COLUMNS_TO_INDEX:
-                    column_files = []
-                    if column in record and type(record[column]) == dict:
-                        column_type = "single_file"
-                        column_files.append(record[column])
-                    elif column in record and type(record[column]) == list:
-                        column_type = "multiple_files"
-                        for each_file in record[column]:
-                            column_files.append(each_file)
-
-                    for column_file in column_files:
-                        if "mediaType" in column_file:
-                            mediaType = column_file["mediaType"]
-                        else:
-                            mediaType = "unknown"
-                        if mediaType in SUPPORTED_MEDIA_TYPES:
-                            print(
-                                "\nDownloading file from table:",
-                                SOURCE_TABLE,
-                                ", record:",
-                                record["id"],
-                                ", column:",
-                                column,
-                                ", filename:",
-                                column_file["name"],
-                            )
-                            if column_type == "single_file":
-                                file = xata.files().get(
-                                    table_name=SOURCE_TABLE,
-                                    column_name=column,
-                                    record_id=record["id"],
-                                    branch_name=BRANCH,
-                                )
-                            elif column_type == "multiple_files":
-                                file = xata.files().get_item(
-                                    table_name=SOURCE_TABLE,
-                                    column_name=column,
-                                    record_id=record["id"],
-                                    file_id=column_file["id"],
-                                    branch_name=BRANCH,
-                                )
-                            if file.is_success():
-                                chunks = process_file(file, mediaType)
-                                print(
-                                    "- Processing record:",
-                                    record["id"],
-                                    ", column:",
-                                    column,
-                                    ", filename:",
-                                    column_file["name"],
-                                    ", type:",
-                                    mediaType,
-                                    "in",
-                                    len(chunks),
-                                    "chunk:" if len(chunks) == 1 else "chunks:",
-                                )
-                                ingest_chunks(
-                                    xata,
-                                    chunks,
-                                    record,
-                                    SOURCE_TABLE,
-                                    TARGET_TABLE,
-                                    column_type,
-                                    column,
-                                    column_file,
-                                )
-                            else:
-                                print(
-                                    "...Error",
-                                    file.response,
-                                    "while fetching file, skipping it.",
-                                )
-                        else:
-                            print(
-                                "\nUnsupported media type",
-                                column_file["mediaType"],
-                                "skipping file",
-                                column_file["name"],
-                                "from record:",
-                                record["id"],
-                                "column:",
-                                column,
-                            )
-
+            process_response(xata, response)
         page = {"after": response.get_cursor(), "size": PAGE_SIZE}
         querypayload = {"columns": COLUMNS_TO_INDEX, "page": page}
         more = response.has_more_results()
