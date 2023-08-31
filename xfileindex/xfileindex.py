@@ -42,6 +42,12 @@ parser.add_argument(
     required=False,
     default=100,
 )
+parser.add_argument(
+    "--psize",
+    help="Maximum number of records per page when scrolling.",
+    required=False,
+    default=200,
+)
 args = parser.parse_args()
 
 TARGET_DB = str(args.db)
@@ -74,7 +80,7 @@ if (TSIZE < 1 or TSIZE > 1000) and MODE == "transaction":
     )
     TSIZE = 100
 
-PAGE_SIZE = 200
+PAGE_SIZE = int(args.psize)
 
 SUPPORTED_MEDIA_TYPES = [
     "text/plain",
