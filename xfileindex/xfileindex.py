@@ -323,17 +323,17 @@ def process_response(xata, response):
                     )
                     if column_type == "single_file":
                         file = xata.files().get(
-                            table_name=SOURCE_TABLE,
-                            column_name=column,
-                            record_id=record["id"],
+                            SOURCE_TABLE,
+                            record["id"],
+                            column,
                             branch_name=BRANCH,
                         )
                     elif column_type == "multiple_files":
                         file = xata.files().get_item(
-                            table_name=SOURCE_TABLE,
-                            column_name=column,
-                            record_id=record["id"],
-                            file_id=column_file["id"],
+                            SOURCE_TABLE,
+                            record["id"],
+                            column,
+                            column_file["id"],
                             branch_name=BRANCH,
                         )
                     if file.is_success():
