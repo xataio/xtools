@@ -387,9 +387,10 @@ def main():
         response = xata.data().query(SOURCE_TABLE, querypayload, branch_name=BRANCH)
         if "records" in response:
             process_response(xata, response)
-        page = {"after": response.get_cursor(), "size": PAGE_SIZE}
-        querypayload = {"columns": COLUMNS_TO_INDEX, "page": page}
         more = response.has_more_results()
+        if more:
+            page = {"after": response.get_cursor(), "size": PAGE_SIZE}
+            querypayload = {"columns": COLUMNS_TO_INDEX, "page": page}
 
 
 if __name__ == "__main__":
