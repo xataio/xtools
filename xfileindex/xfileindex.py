@@ -81,6 +81,13 @@ if (TSIZE < 1 or TSIZE > 1000) and MODE == "transaction":
     TSIZE = 100
 
 PAGE_SIZE = int(args.psize)
+if PAGE_SIZE < 1 or PAGE_SIZE > 200:
+    print(
+        "Invalid psize parameter",
+        PAGE_SIZE,
+        ", the number of records per page must be between 1 and 200. Using the default instead (200).",
+    )
+    PAGE_SIZE = 200
 
 SUPPORTED_MEDIA_TYPES = [
     "text/plain",

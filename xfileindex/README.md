@@ -39,6 +39,7 @@ Optional parameters:
 - `--maxchunk`: Maximum text chunk size. Default is `200000` which is the maximum text column size supported in Xata.
 - `--mode`: Select write mode between `atomic` or `transaction`. The default mode is [transaction](https://xata.io/docs/sdk/transaction) which is faster and more efficient as it writes multiple records with each request. The `atomic` mode writes one record per request and can be used for troubleshooting purposes such as inspecting the response code and message for certain chunks.
 - `--tsize`: Relevant only when write mode is `transaction`, specifies how many chunks (records) will be written or updated with every request. The maximum number of operations per transaction is `1000``.
+-- `--psize`: The number of records per page to fetch while scrolling. Default is `200`, which is also the maximum.
 
 ## Dependencies
 
