@@ -58,9 +58,9 @@ File types that are not supported by this script are skipped. If you would like 
 
 # localfileindex
 
-A barebones version that indexes local files (from disk) to Xata.
-Supports only the transactions indexing approach.
-Extrapolates the file type from the file extension, supporting `.pdf`,`.txt`,`.csv`.
+An alternative version of the script that indexes local files (from disk, instead of file attachments) to Xata.
+Provides only the transactions and random id indexing approach.
+It extrapolates the file type from the file extension, supporting `.pdf`,`.txt`,`.csv`.
 
 Usage:
 
