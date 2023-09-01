@@ -177,6 +177,11 @@ def ingest_chunks(
                     )
                 else:
                     print("Response", resp.status_code, resp)
+                    while resp.status_code == 429:
+                        print("Throttled. Retrying...")
+                        resp = xata.records().upsert(
+                            TARGET_TABLE, chunk_rec_id, content_record, branch_name=BRANCH
+                        )
             elif MODE == "transaction":
                 transaction_payload["operations"].append(
                     {
@@ -203,6 +208,11 @@ def ingest_chunks(
                     )
                 else:
                     print("Response", resp.status_code, resp)
+                    while resp.status_code == 429:
+                        print("Throttled. Retrying...")
+                        resp = xata.records().insert(
+                            TARGET_TABLE, content_record, branch_name=BRANCH
+                        )
             elif MODE == "transaction":
                 transaction_payload["operations"].append(
                     {
@@ -231,6 +241,11 @@ def ingest_chunks(
                 )
             else:
                 print("Response", resp.status_code, resp)
+                while resp.status_code == 429:
+                    print("Throttled. Retrying...")
+                    resp = xata.records().transaction(
+                        payload=transaction_payload, branch_name=BRANCH
+                    )
             transaction_payload = {}
             transaction_payload["operations"] = []
         chunk_iterator += 1
