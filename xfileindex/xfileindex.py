@@ -246,7 +246,6 @@ def ingest_chunks(
                     resp = xata.records().transaction(
                         payload=transaction_payload, branch_name=BRANCH
                     )
-            transaction_payload = {}
             transaction_payload["operations"] = []
         chunk_iterator += 1
 
