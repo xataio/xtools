@@ -65,7 +65,7 @@ It extrapolates the file type from the file extension, supporting `.pdf`,`.txt`,
 Usage:
 
 ```
-python localfileindex.py --db https://ws-fdrujb.eu-central-1.xata.sh/db/myfilesdb --file ~/Downloads/myfile.txt --dest myIndexTable
+python localfileindex.py --db https://{workspace}.{region}.xata.sh/db/{db} --file ~/path/to/myfile.txt --dest mytable
 ```
 
 localfileindex Parameters:
