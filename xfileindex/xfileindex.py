@@ -227,7 +227,7 @@ def ingest_chunks(
             or chunk_iterator == (len(chunks) - 1)
         ):
             resp = xata.records().transaction(
-                payload=transaction_payload, branch_name=BRANCH
+                transaction_payload, branch_name=BRANCH
             )
             if resp.status_code == 200:
                 print(
@@ -244,7 +244,7 @@ def ingest_chunks(
                 while resp.status_code == 429:
                     print("Throttled. Retrying...")
                     resp = xata.records().transaction(
-                        payload=transaction_payload, branch_name=BRANCH
+                        transaction_payload, branch_name=BRANCH
                     )
             transaction_payload["operations"] = []
         chunk_iterator += 1
