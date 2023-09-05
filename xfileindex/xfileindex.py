@@ -1,5 +1,6 @@
 import argparse
 from xata.client import XataClient
+from xata.helpers import Transaction
 from json import loads
 from textwrap import wrap
 from PyPDF2 import PdfReader
@@ -147,8 +148,7 @@ def ingest_chunks(
 ):
     chunk_iterator = 0
     if MODE == "transaction":
-        transaction_payload = {}
-        transaction_payload["operations"] = []
+        trx = Transaction(xata)
     for chunk in chunks:
         content_record = {
             "content": chunk,
@@ -165,7 +165,7 @@ def ingest_chunks(
                 chunk_rec_id = f'{source_record["id"]}-{SOURCE_TABLE}-{column}-{column_file["id"]}-{chunk_iterator}'
             if MODE == "atomic":
                 resp = xata.records().upsert(
-                    TARGET_TABLE, chunk_rec_id, content_record, branch_name=BRANCH
+                    TARGET_TABLE, chunk_rec_id, content_record
                 )
                 if resp.status_code in (200, 201):
                     print(
@@ -180,23 +180,14 @@ def ingest_chunks(
                     while resp.status_code == 429:
                         print("Throttled. Retrying...")
                         resp = xata.records().upsert(
-                            TARGET_TABLE, chunk_rec_id, content_record, branch_name=BRANCH
+                            TARGET_TABLE, chunk_rec_id, content_record
                         )
             elif MODE == "transaction":
-                transaction_payload["operations"].append(
-                    {
-                        "update": {
-                            "table": TARGET_TABLE,
-                            "id": chunk_rec_id,
-                            "fields": content_record,
-                            "upsert": True,
-                        }
-                    }
-                )
+                trx.update(TARGET_TABLE, chunk_rec_id, content_record,True)
         elif ID_STRATEGY == "random":
             if MODE == "atomic":
                 resp = xata.records().insert(
-                    TARGET_TABLE, content_record, branch_name=BRANCH
+                    TARGET_TABLE, content_record
                 )
                 if resp.status_code == 201:
                     print(
@@ -211,42 +202,32 @@ def ingest_chunks(
                     while resp.status_code == 429:
                         print("Throttled. Retrying...")
                         resp = xata.records().insert(
-                            TARGET_TABLE, content_record, branch_name=BRANCH
+                            TARGET_TABLE, content_record
                         )
             elif MODE == "transaction":
-                transaction_payload["operations"].append(
-                    {
-                        "insert": {
-                            "table": TARGET_TABLE,
-                            "record": content_record,
-                        }
-                    }
-                )
+                trx.insert(TARGET_TABLE, content_record)
         if MODE == "transaction" and (
-            len(transaction_payload["operations"]) == TSIZE
+            len(trx.operations["operations"]) == TSIZE
             or chunk_iterator == (len(chunks) - 1)
         ):
-            resp = xata.records().transaction(
-                transaction_payload, branch_name=BRANCH
-            )
-            if resp.status_code == 200:
+            retriable_operations=trx.operations
+            resp = trx.run()
+            if resp["status_code"] == 200:
                 print(
                     "  Indexed",
                     chunk_iterator + 1,
                     "/",
                     len(chunks),
                     "chunk."
-                    if len(transaction_payload["operations"]) == 1
+                    if len(trx.operations["operations"]) == 1
                     else "chunks.",
                 )
             else:
-                print("Response", resp.status_code, resp)
-                while resp.status_code == 429:
+                print("Response", resp["status_code"], resp)
+                while resp["status_code"] == 429:
                     print("Throttled. Retrying...")
-                    resp = xata.records().transaction(
-                        transaction_payload, branch_name=BRANCH
-                    )
-            transaction_payload["operations"] = []
+                    trx.operations=retriable_operations
+                    resp = trx.run()
         chunk_iterator += 1
 
 
@@ -262,10 +243,10 @@ def ensure_target_table(xata: XataClient):
             {"name": "source", "type": "link", "link": {"table": SOURCE_TABLE}},
         ]
     }
-    create_table_response = xata.table().create(TARGET_TABLE, branch_name=BRANCH)
+    create_table_response = xata.table().create(TARGET_TABLE)
     if create_table_response.status_code == 201:
         set_table_schema_resp = xata.table().set_schema(
-            TARGET_TABLE, target_table_schema, branch_name=BRANCH
+            TARGET_TABLE, target_table_schema
         )
         if not set_table_schema_resp.is_success():
             print(
@@ -278,7 +259,7 @@ def ensure_target_table(xata: XataClient):
         print("Created new table", TARGET_TABLE)
     elif create_table_response.status_code == 204:
         get_table_schema_response = xata.table().get_schema(
-            TARGET_TABLE, branch_name=BRANCH
+            TARGET_TABLE
         )
         if get_table_schema_response.is_success():
             current_schema = loads(get_table_schema_response.content)
@@ -339,16 +320,14 @@ def process_response(xata, response):
                         file = xata.files().get(
                             SOURCE_TABLE,
                             record["id"],
-                            column,
-                            branch_name=BRANCH,
+                            column
                         )
                     elif column_type == "multiple_files":
                         file = xata.files().get_item(
                             SOURCE_TABLE,
                             record["id"],
                             column,
-                            column_file["id"],
-                            branch_name=BRANCH,
+                            column_file["id"]
                         )
                     if file.is_success():
                         chunks = process_file(file, mediaType)
@@ -393,12 +372,12 @@ def process_response(xata, response):
 
 
 def main():
-    xata = XataClient(db_url=TARGET_DB, branch_name=BRANCH)
+    xata = XataClient(db_url=TARGET_DB+":"+BRANCH)
     ensure_target_table(xata)
     querypayload = {"columns": COLUMNS_TO_INDEX, "page": {"size": PAGE_SIZE}}
     more = True
     while more:
-        response = xata.data().query(SOURCE_TABLE, querypayload, branch_name=BRANCH)
+        response = xata.data().query(SOURCE_TABLE, querypayload)
         if "records" in response:
             process_response(xata, response)
         more = response.has_more_results()
