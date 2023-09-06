@@ -6,6 +6,9 @@ from textwrap import wrap
 from PyPDF2 import PdfReader
 from io import BytesIO
 
+# Tool version
+__version__ = "0.0.1"
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--db", help="Database endpoint.", required=True)
 parser.add_argument("--branch", help="Branch name.", required=False, default="main")
@@ -373,6 +376,7 @@ def process_response(xata, response):
 
 def main():
     xata = XataClient(db_url=TARGET_DB+":"+BRANCH)
+    xata.set_header("x-xata-agent", "%sxfileindex=%s;" % (xata.get_headers()["x-xata-agent"], __version__))
     ensure_target_table(xata)
     querypayload = {"columns": COLUMNS_TO_INDEX, "page": {"size": PAGE_SIZE}}
     more = True
