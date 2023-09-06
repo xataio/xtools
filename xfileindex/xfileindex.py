@@ -101,7 +101,7 @@ SUPPORTED_MEDIA_TYPES = [
 
 
 def process_file(file, mediaType):
-    mediaType = mediaType.lower() # consistency 
+    mediaType = mediaType.lower()  # consistency
     if mediaType.startswith("text/plain") or mediaType.startswith("text/csv"):
         chunked_text = process_text_file(file)
     elif mediaType.startswith("application/pdf"):
@@ -168,9 +168,7 @@ def ingest_chunks(
             elif column_type == "multiple_files":
                 chunk_rec_id = f'{source_record["id"]}-{SOURCE_TABLE}-{column}-{column_file["id"]}-{chunk_iterator}'
             if MODE == "atomic":
-                resp = xata.records().upsert(
-                    TARGET_TABLE, chunk_rec_id, content_record
-                )
+                resp = xata.records().upsert(TARGET_TABLE, chunk_rec_id, content_record)
                 if resp.status_code in (200, 201):
                     print(
                         "  id:",
@@ -187,12 +185,10 @@ def ingest_chunks(
                             TARGET_TABLE, chunk_rec_id, content_record
                         )
             elif MODE == "transaction":
-                trx.update(TARGET_TABLE, chunk_rec_id, content_record,True)
+                trx.update(TARGET_TABLE, chunk_rec_id, content_record, True)
         elif ID_STRATEGY == "random":
             if MODE == "atomic":
-                resp = xata.records().insert(
-                    TARGET_TABLE, content_record
-                )
+                resp = xata.records().insert(TARGET_TABLE, content_record)
                 if resp.status_code == 201:
                     print(
                         "  id:",
@@ -205,16 +201,14 @@ def ingest_chunks(
                     print("Response", resp.status_code, resp)
                     while resp.status_code == 429:
                         print("Throttled. Retrying...")
-                        resp = xata.records().insert(
-                            TARGET_TABLE, content_record
-                        )
+                        resp = xata.records().insert(TARGET_TABLE, content_record)
             elif MODE == "transaction":
                 trx.insert(TARGET_TABLE, content_record)
         if MODE == "transaction" and (
             len(trx.operations["operations"]) == TSIZE
             or chunk_iterator == (len(chunks) - 1)
         ):
-            retriable_operations=trx.operations
+            retriable_operations = trx.operations
             resp = trx.run()
             if resp["status_code"] == 200:
                 print(
@@ -222,15 +216,13 @@ def ingest_chunks(
                     chunk_iterator + 1,
                     "/",
                     len(chunks),
-                    "chunk."
-                    if len(trx.operations["operations"]) == 1
-                    else "chunks.",
+                    "chunk." if len(trx.operations["operations"]) == 1 else "chunks.",
                 )
             else:
                 print("Response", resp["status_code"], resp)
                 while resp["status_code"] == 429:
                     print("Throttled. Retrying...")
-                    trx.operations=retriable_operations
+                    trx.operations = retriable_operations
                     resp = trx.run()
         chunk_iterator += 1
 
@@ -262,9 +254,7 @@ def ensure_target_table(xata: XataClient):
             exit(-1)
         print("Created new table", TARGET_TABLE)
     elif create_table_response.status_code == 204:
-        get_table_schema_response = xata.table().get_schema(
-            TARGET_TABLE
-        )
+        get_table_schema_response = xata.table().get_schema(TARGET_TABLE)
         if get_table_schema_response.is_success():
             current_schema = loads(get_table_schema_response.content)
             if current_schema != target_table_schema:
@@ -321,17 +311,10 @@ def process_response(xata, response):
                         column_file["name"],
                     )
                     if column_type == "single_file":
-                        file = xata.files().get(
-                            SOURCE_TABLE,
-                            record["id"],
-                            column
-                        )
+                        file = xata.files().get(SOURCE_TABLE, record["id"], column)
                     elif column_type == "multiple_files":
                         file = xata.files().get_item(
-                            SOURCE_TABLE,
-                            record["id"],
-                            column,
-                            column_file["id"]
+                            SOURCE_TABLE, record["id"], column, column_file["id"]
                         )
                     if file.is_success():
                         chunks = process_file(file, mediaType)
@@ -376,14 +359,17 @@ def process_response(xata, response):
 
 
 def main():
-    xata = XataClient(db_url=TARGET_DB+":"+BRANCH)
-    xata.set_header("x-xata-agent", "%sxfileindex=%s;" % (xata.get_headers()["x-xata-agent"], __version__))
+    xata = XataClient(db_url=f"{TARGET_DB}:{BRANCH}")
+    xata.set_header(
+        "x-xata-agent",
+        "%sxfileindex=%s;" % (xata.get_headers()["x-xata-agent"], __version__),
+    )
     ensure_target_table(xata)
     querypayload = {"columns": COLUMNS_TO_INDEX, "page": {"size": PAGE_SIZE}}
     more = True
     while more:
         response = xata.data().query(SOURCE_TABLE, querypayload)
-        if "records" in response:
+        if response.is_success():
             process_response(xata, response)
         more = response.has_more_results()
         if more:
