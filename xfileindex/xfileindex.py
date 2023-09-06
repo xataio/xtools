@@ -101,9 +101,10 @@ SUPPORTED_MEDIA_TYPES = [
 
 
 def process_file(file, mediaType):
-    if mediaType == "text/plain" or mediaType == "text/csv":
+    mediaType = mediaType.lower() # consistency 
+    if mediaType.startswith("text/plain") or mediaType.startswith("text/csv"):
         chunked_text = process_text_file(file)
-    elif mediaType == "application/pdf":
+    elif mediaType.startswith("application/pdf"):
         chunked_text = process_pdf_file(file)
     else:
         chunked_text = []
