@@ -266,6 +266,10 @@ columns_migration={}
 columns_migration["operations"]=[]
 tables=[]
 schema_links={}
+if len(from_schema["schema"]["tables"]) == 0:
+    print("Aborting, the origin database branch: ",from_BRANCH_URL, " does not contain any table") 
+    exit(-1) 
+
 #Create tables and columns in two sequential migration requests 
 for table in from_schema["schema"]["tables"]:
     schema_links[table["name"]]={}
